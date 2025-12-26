@@ -1,31 +1,36 @@
 from pathlib import Path
+from rich.console import Console
 from typing import Annotated
 import datasus_dbc
 import glob
-import konsole
 import nbformat as nbf
 import os
 import typer
 
-app = typer.Typer()
+app = typer.Typer(help="Descompacta arquivos DBC do DATASUS e cria notebooks Jupyter.")
+konsole = Console()
 
 
 def picle_pandas(file: Path):
+    """
+    Cria um arquivo pickle com o conteúdo do DBC para DataFrames do Pandas.
+    """
     from dbfread import DBF
     from pandas import DataFrame
+
     target_pickle = file.with_suffix(".pkl")
 
     if target_pickle.exists():
-        konsole.log(f"Ignorando criação do arquivo pickle para {file.name}…")
+        konsole.print(f"Ignorando criação do arquivo pickle para {file.name}…")
         return target_pickle
 
     # https://stackoverflow.com/a/46000253/437459
     dbf = DBF(file, encoding="cp1252")
-    konsole.log(f"Lendo DBF {file.name} em um DataFrame do Pandas…")
+    konsole.print(f"Lendo DBF {file.name} em um DataFrame do Pandas…")
     # https://dbfread.readthedocs.io/en/latest/exporting_data.html#pandas-data-frames
     frame = DataFrame(iter(dbf))
 
-    konsole.log(f"Salvando DataFrame em {target_pickle.name}…")
+    konsole.print(f"Salvando DataFrame em {target_pickle.name}…")
     # https://stackoverflow.com/a/17098736/437459
     frame.to_pickle(target_pickle)
     return target_pickle
@@ -33,12 +38,31 @@ def picle_pandas(file: Path):
 
 @app.command()
 def main(
-    dir: Annotated[str, typer.Argument()] = "",
+    dir: Annotated[
+        str,
+        typer.Argument(
+            help="Pasta onde os arquivos DBC estão localizados",
+            show_default="pasta atual",
+        ),
+    ] = "",
     rw_ipynb: Annotated[
         bool,
-        typer.Option("--rw-ipynb", help="Recria notebooks Jupyter para leitura dos arquivos DBC."),
+        typer.Option(
+            "--rw-ipynb",
+            help="Sobrescreve os arquivos .ipynb (notebooks Jupyter)",
+        ),
     ] = False,
 ):
+    """
+    Processa os arquivos DBC em uma pasta,
+    descompactando-os para DBF
+    e criando notebooks Jupyter.
+
+    :param dir: Pasta onde os arquivos DBC estão localizados
+    :type dir: str
+    :param rw_ipynb: Recria notebooks Jupyter para leitura dos arquivos DBC
+    :type rw_ipynb: bool
+    """
     if len(dir) < 1:
         dir = Path(os.getcwd())
     else:
@@ -49,11 +73,11 @@ def main(
         target_dbf = pathable.with_suffix(".dbf")
 
         if target_dbf.exists():
-            konsole.log(f"Ignorando {pathable.name}, arquivo DBF já existe.")
+            konsole.print(f"Ignorando {pathable.name}, arquivo DBF já existe.")
             continue
 
-        konsole.log(f"Descompactando {pathable.name}…")
-        konsole.log(f"Arquivo: {target_dbf}")
+        konsole.print(f"Descompactando {pathable.name}…")
+        konsole.print(f"Arquivo: {target_dbf}")
         datasus_dbc.decompress(file, str(target_dbf))
 
     for file in glob.glob(str(dir / "*.dbf")):
@@ -62,7 +86,7 @@ def main(
         ipynb_dbf = target_dbf.relative_to(target_ipynb.parent)
 
         if target_ipynb.exists() and not rw_ipynb:
-            konsole.log(f"Ignorando {pathable.name}, arquivo .ipynb já existe.")
+            konsole.print(f"Ignorando {pathable.name}, arquivo .ipynb já existe.")
             continue
 
         # https://stackoverflow.com/a/45672031/437459
@@ -93,8 +117,8 @@ def main(
             nbf.v4.new_code_cell(code),
         ]
 
-        konsole.log(f"Criando Python Notebook para {pathable.name}…")
-        konsole.log(f"Arquivo: {target_ipynb}")
+        konsole.print(f"Criando Python Notebook para {pathable.name}…")
+        konsole.print(f"Arquivo: {target_ipynb}")
 
         with open(target_ipynb, "w") as f:
             nbf.write(nb, f)
