@@ -6,10 +6,12 @@ let
     black
     dbfread
     nbformat
+    pandas
     pip
     pyarrow
     pylance
     # regex
+    typer
     virtualenv
     werkzeug # webserver
   ]);
